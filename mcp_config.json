@@ -1,0 +1,20 @@
+{
+  "filesystem": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "${NOTES_DIR}"]
+  },
+  "tavily": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "tavily-mcp@latest"],
+    "env": {
+      "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+    }
+  },
+  "sqlite": {
+    "transport": "stdio",
+    "command": "mcp-server-sqlite",
+    "args": ["--db-path", "${SQLITE_PATH}"]
+  }
+}
