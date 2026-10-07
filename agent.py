@@ -7,7 +7,6 @@ import os
 from dataclasses import dataclass, field
 
 from langchain.agents import create_agent
-from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.errors import GraphRecursionError
 
@@ -54,7 +53,28 @@ class ResearchAgent:
     clients: list = field(default_factory=list)
 
 
-def build_model() -> ChatOpenAI:
+def build_model():
+    """Use the NVIDIA NIM client when NVIDIA_API_KEY is set, otherwise OpenAI."""
+    nvidia_key = os.environ.get("NVIDIA_API_KEY")
+    if nvidia_key:
+        from langchain_nvidia_ai_endpoints import ChatNVIDIA
+
+        # Same client settings as the NIM sample for this key.
+        return ChatNVIDIA(
+            model=os.environ.get(
+                "NVIDIA_MODEL",
+                "nvidia/nemotron-3.5-lightning-30b-a3b",
+            ),
+            api_key=nvidia_key,
+            temperature=1,
+            top_p=0.95,
+            max_tokens=16384,
+            reasoning_budget=16384,
+            chat_template_kwargs={"enable_thinking": True},
+        )
+
+    from langchain_openai import ChatOpenAI
+
     model_name = os.environ.get("OPENAI_MODEL", "gpt-5")
     kwargs: dict = {
         "model": model_name,

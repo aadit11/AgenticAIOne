@@ -39,8 +39,8 @@ class ChatResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError("OPENAI_API_KEY is not set")
+    if not os.getenv("NVIDIA_API_KEY") and not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("Set NVIDIA_API_KEY or OPENAI_API_KEY")
     from agent import build_agent
 
     app.state.runtime = await build_agent()

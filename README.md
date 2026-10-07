@@ -18,7 +18,7 @@ Discovery and calls go through `langchain-mcp-adapters` (`tools/list` and `tools
 
 ## Cost
 
-- **LLM.** Default is OpenAI `gpt-5`, billed per token. At assignment scale this stays small if you do not loop the endpoint. NVIDIA NIM is the zero-cost alternative: set `OPENAI_BASE_URL=https://integrate.api.nvidia.com/v1`, put the NIM key in `OPENAI_API_KEY`, and set `OPENAI_MODEL` to a model id from [build.nvidia.com](https://build.nvidia.com). The assignment names Nemotron 3 Ultra and Nemotron 3.5 Lightning. The free tier is about 40 requests per minute.
+- **LLM.** Default is NVIDIA NIM through `ChatNVIDIA`, model `nvidia/nemotron-3.5-lightning-30b-a3b`. Put the key in `NVIDIA_API_KEY` inside `.env`. The free tier is about 40 requests per minute. OpenAI `gpt-5` is used only when `NVIDIA_API_KEY` is unset and `OPENAI_API_KEY` is set.
 - **Tavily.** The coursework free tier is enough. The Project Plan includes 4,000 credits per month.
 - **Filesystem and SQLite.** No external API cost.
 - **Cloud Run.** `us-west1`, 512Mi, minimum 0 instances, maximum 1 instance. Scale-to-zero keeps idle cost near zero. Last semester's reference for three Cloud Run projects was under $10 of the $50 education credit.
@@ -64,8 +64,8 @@ cp .env.example .env
 Edit `.env`. Never commit it.
 
 ```text
-OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5
+NVIDIA_API_KEY=...
+NVIDIA_MODEL=nvidia/nemotron-3.5-lightning-30b-a3b
 TAVILY_API_KEY=...
 GCP_PROJECT_ID=...
 ```

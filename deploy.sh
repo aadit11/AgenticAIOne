@@ -16,11 +16,21 @@ source .env
 set +a
 
 : "${GCP_PROJECT_ID:?Set GCP_PROJECT_ID in .env}"
-: "${OPENAI_API_KEY:?Set OPENAI_API_KEY in .env}"
 : "${TAVILY_API_KEY:?Set TAVILY_API_KEY in .env}"
+if [[ -z "${NVIDIA_API_KEY:-}" && -z "${OPENAI_API_KEY:-}" ]]; then
+  echo "Set NVIDIA_API_KEY or OPENAI_API_KEY in .env" >&2
+  exit 1
+fi
 
-OPENAI_MODEL="${OPENAI_MODEL:-gpt-5}"
-ENV_VARS="OPENAI_API_KEY=${OPENAI_API_KEY},OPENAI_MODEL=${OPENAI_MODEL},TAVILY_API_KEY=${TAVILY_API_KEY},MCP_SERVERS_CONFIG=/app/mcp_config.json,NOTES_DIR=/app/notes,SQLITE_PATH=/app/data/research.db"
+ENV_VARS="TAVILY_API_KEY=${TAVILY_API_KEY},MCP_SERVERS_CONFIG=/app/mcp_config.json,NOTES_DIR=/app/notes,SQLITE_PATH=/app/data/research.db"
+if [[ -n "${NVIDIA_API_KEY:-}" ]]; then
+  NVIDIA_MODEL="${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}"
+  ENV_VARS="${ENV_VARS},NVIDIA_API_KEY=${NVIDIA_API_KEY},NVIDIA_MODEL=${NVIDIA_MODEL}"
+fi
+if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+  OPENAI_MODEL="${OPENAI_MODEL:-gpt-5}"
+  ENV_VARS="${ENV_VARS},OPENAI_API_KEY=${OPENAI_API_KEY},OPENAI_MODEL=${OPENAI_MODEL}"
+fi
 if [[ -n "${OPENAI_BASE_URL:-}" ]]; then
   ENV_VARS="${ENV_VARS},OPENAI_BASE_URL=${OPENAI_BASE_URL}"
 fi
