@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -31,6 +32,19 @@ def sqlite_path() -> Path:
 
 def config_path() -> Path:
     return Path(os.environ.get("MCP_SERVERS_CONFIG", ROOT / "mcp_config.json")).expanduser().resolve()
+
+
+def sqlite_server_command() -> str:
+    """Use the venv script path so Windows can launch the SQLite MCP server."""
+    override = os.environ.get("SQLITE_MCP_COMMAND", "").strip()
+    if override:
+        return override
+    scripts = Path(sys.executable).resolve().parent
+    for name in ("mcp-server-sqlite.exe", "mcp-server-sqlite"):
+        candidate = scripts / name
+        if candidate.is_file():
+            return str(candidate)
+    return "mcp-server-sqlite"
 
 
 def ensure_storage() -> tuple[Path, Path]:
@@ -99,6 +113,8 @@ def load_server_config(
             skipped.append(f"{name}: server manifest is not an object")
             continue
         command = _substitute(str(spec.get("command", "")), variables).strip()
+        if command == "mcp-server-sqlite":
+            command = sqlite_server_command()
         args = [_substitute(str(arg), variables) for arg in spec.get("args", [])]
         if not command:
             skipped.append(f"{name}: manifest has no command")
