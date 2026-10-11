@@ -1,8 +1,8 @@
 # Research Notebook Agent
 
-A LangGraph agent for CSCI 599 Assignment 1. It answers `POST /chat`, chooses among three MCP servers, and remembers the conversation for a `session_id` while the Cloud Run instance is running.
+A research notebook for CSCI 599 Assignment 1. It is not a general chatbot. `POST /chat` does five things: explain a concept from knowledge, search the web, save a markdown note, catalog the source in SQLite, and remember the session.
 
-The notebook can explain a topic from its own knowledge, search the web, save a markdown note, and record the source in a small SQLite catalog. A question that asks it to find something and keep it runs more than one tool before it answers.
+A request to find something and keep it searches, writes the note, and inserts a catalog row before it answers. A definition, or a question about the conversation, uses no tool. The `session_id` keeps that notebook thread while the Cloud Run instance is running.
 
 ## MCP servers
 

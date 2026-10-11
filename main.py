@@ -8,8 +8,8 @@ from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, field_validator
+from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 load_dotenv()
 
@@ -21,6 +21,15 @@ logger = logging.getLogger(__name__)
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "query": "What is an MCP server? Answer in two sentences.",
+                "session_id": "demo",
+            }
+        }
+    )
+
     query: str = Field(min_length=1)
     session_id: str = Field(min_length=1)
 
@@ -52,7 +61,16 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Research Notebook Agent", lifespan=lifespan)
+app = FastAPI(
+    title="Research Notebook",
+    description="Send a research question to POST /chat. Use the same session_id to continue a notebook thread.",
+    lifespan=lifespan,
+)
+
+
+@app.get("/", include_in_schema=False)
+async def home() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health")
