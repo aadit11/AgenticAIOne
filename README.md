@@ -19,13 +19,13 @@ Discovery and calls go through `langchain-mcp-adapters` (`tools/list` and `tools
 
 ## Cost
 
-- **LLM.** Default is NVIDIA NIM through `ChatNVIDIA`, model `nvidia/nemotron-3.5-lightning-30b-a3b`. Put the key in `NVIDIA_API_KEY` inside `.env`. The free tier is about 40 requests per minute. OpenAI `gpt-5` is used only when `NVIDIA_API_KEY` is unset and `OPENAI_API_KEY` is set.
+- **LLM.** NVIDIA NIM through `ChatNVIDIA`, model `nvidia/nemotron-3.5-lightning-30b-a3b`. Put the key in `NVIDIA_API_KEY` inside `.env`. The free tier is about 40 requests per minute.
 - **Tavily.** The coursework free tier is enough. The Project Plan includes 4,000 credits per month.
 - **Filesystem and SQLite.** No external API cost.
 - **Weather.** Open-Meteo through `weather-open-meteo-mcp@0.1.2`. No API key. The non-commercial forecast API is free.
 - **Cloud Run.** `us-west1`, 512Mi, minimum 0 instances, maximum 1 instance. Scale-to-zero keeps idle cost near zero. Last semester's reference for three Cloud Run projects was under $10 of the $50 education credit.
 
-Ollama is for local experiments only. Do not deploy it. The live service must use OpenAI or NIM.
+Local runs use the same NVIDIA NIM model as the live service.
 
 ## Layout
 
@@ -143,7 +143,7 @@ Submit the printed URL, for example `https://csci599-a1-xxxxxxxxxx-uw.a.run.app`
 flowchart LR
   Client[Client] -->|POST /chat query, session_id| API[FastAPI]
   API --> Graph[LangGraph agent]
-  Graph <--> LLM[LLM: OpenAI GPT-5 or NVIDIA NIM]
+  Graph <--> LLM[LLM: NVIDIA NIM]
   Graph <--> Memory[MemorySaver checkpointer]
   Graph --> Wrapper[MCP client wrapper]
   Wrapper -->|tools/list and tools/call| FS[Filesystem MCP server]
@@ -181,14 +181,15 @@ The arrow from synthesis back to reasoning is the multi-step loop. Search, then 
 ```mermaid
 flowchart LR
   Laptop[Local dev: Python or Docker]
-  Ollama[Ollama, local testing only]
+  NIM[NVIDIA NIM]
   Dotenv[.env on the laptop]
   Image[Docker image]
   Registry[Artifact Registry gcr.io]
   Run[Cloud Run us-west1]
   URL[Live URL]
 
-  Laptop --> Ollama
+  Laptop -->|ChatNVIDIA| NIM
+  Run -->|ChatNVIDIA| NIM
   Laptop --> Dotenv
   Laptop --> Image
   Image --> Registry
@@ -197,7 +198,7 @@ flowchart LR
   Run --> URL
 ```
 
-Local runs read `.env` through `python-dotenv`. `deploy.sh` sources the same file and passes `OPENAI_API_KEY`, `OPENAI_MODEL`, `TAVILY_API_KEY`, and the MCP paths to Cloud Run. The live service uses the cloud LLM, not Ollama.
+Local runs and Cloud Run both call NVIDIA NIM through `ChatNVIDIA`. Local runs read `.env` through `python-dotenv`. `deploy.sh` sources the same file and passes `NVIDIA_API_KEY`, `NVIDIA_MODEL`, `TAVILY_API_KEY`, and the MCP paths to Cloud Run.
 
 ## Request contract
 
