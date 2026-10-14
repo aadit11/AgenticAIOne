@@ -7,3 +7,4 @@ langchain-nvidia-ai-endpoints>=0.3.0
 langchain-mcp-adapters>=0.3.0
 mcp-server-sqlite==2025.4.25
 python-dotenv>=1.0.1
+tzdata>=2024.1

@@ -1,6 +1,9 @@
 import unittest
+from datetime import datetime
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
+from agent import apply_clock
 from mcp_errors import classify_failure, format_failure, malformed_reason
 from response_text import extract_response
 
@@ -60,6 +63,39 @@ class FormatAndResponseTests(unittest.TestCase):
             ]
         }
         self.assertEqual(extract_response(result), "the last answer")
+
+    def test_prefers_reply_text_over_thinking(self) -> None:
+        result = {
+            "messages": [
+                SimpleNamespace(
+                    type="ai",
+                    content=[{"type": "reasoning", "text": "scratch"}, {"type": "text", "text": "the reply"}],
+                    additional_kwargs={"reasoning_content": "scratch\nnot this"},
+                )
+            ]
+        }
+        self.assertEqual(extract_response(result), "the reply")
+
+    def test_uses_last_thinking_line_when_the_reply_is_empty(self) -> None:
+        result = {
+            "messages": [
+                SimpleNamespace(
+                    type="ai",
+                    content="",
+                    additional_kwargs={
+                        "reasoning_content": "No earlier turn in this session.\nYou have not told me a research topic."
+                    },
+                )
+            ]
+        }
+        self.assertEqual(extract_response(result), "You have not told me a research topic.")
+
+    def test_clock_fills_today(self) -> None:
+        stamped = apply_clock(
+            "Today is <<TODAY>>.",
+            datetime(2026, 10, 13, 22, tzinfo=ZoneInfo("America/Los_Angeles")),
+        )
+        self.assertEqual(stamped, "Today is Tuesday, October 13, 2026.")
 
 
 def json_error() -> Exception:

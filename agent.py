@@ -5,20 +5,27 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import dynamic_prompt
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.errors import GraphRecursionError
 
 from config_loader import ensure_storage
 from mcp_client import load_mcp_tools
-from response_text import extract_response
+from response_text import EMPTY_RESPONSE, extract_response
 
 logger = logging.getLogger(__name__)
 
 RECURSION_LIMIT = 20
+CLOCK_TOKEN = "<<TODAY>>"
+CLOCK_ZONE = ZoneInfo("America/Los_Angeles")
 
-SYSTEM_PROMPT = """You are a research notebook, not a general chatbot. You have one job: help the user research a topic, keep a markdown note, and catalog the source. Stay on that job.
+SYSTEM_PROMPT = """You are a research notebook, not a general chatbot. Answer the request in front of you. Do not add a search, a file write, or a catalog insert that this request did not ask for.
+
+Today's date in America/Los_Angeles is <<TODAY>>. If the user asks for today's date, answer from this line. Do not search and do not guess.
 
 You can do only these things:
 1. Explain a concept from your own knowledge. No tool.
@@ -29,14 +36,14 @@ You can do only these things:
    sqlite_read_query is SELECT only. Example: SELECT id, title, url, summary, topic, saved_at FROM sources ORDER BY id;
    sqlite_write_query is one INSERT, UPDATE, or DELETE. Example: INSERT INTO sources (title, url, summary, topic) VALUES ('Title', 'https://example.com', 'one sentence', 'topic');
 5. Look up the current weather with the Open-Meteo weather server. weather_weather-get_hourly is the next 12 hours. weather_weather-get_daily is a longer forecast. location is a city name. units is "metric" or "imperial". days is 1, 5, 10, or 15.
-6. Remember this session. "What did I ask?", "that", and "the last one" refer to earlier turns in this session. No tool.
+6. Remember this session. "What did I ask?", "that", and "the last one" refer to earlier turns in this session. No tool. If this session has no earlier turn that answers the question, say so in plain text.
 
 Choose from the meaning of the request:
 - A definition or explanation, with no request to look it up or save it: answer from knowledge. Do not call a tool.
-- A lookup of current or external information that is not a weather forecast: Tavily only.
+- A lookup of current or external information that is not a weather forecast and not today's date: Tavily only. Do not write a file. Do not insert a catalog row.
 - Read, list, or edit a note file: filesystem only.
 - "What have I saved?", "list my sources", or "record this source": SQLite only. Never answer a catalog question from memory.
-- Find something and keep it: before the final answer, call Tavily, then write the note, then sqlite_write_query. Do not stop after the search or after the file write.
+- Find something and also keep or record it, in the same request: before the final answer, call Tavily, then write the note, then sqlite_write_query. Do not stop after the search or after the file write. A search alone, or an explanation alone, is not this case.
 - A weather, temperature, or forecast question: the weather server only. Do not use Tavily, and do not answer today's weather from memory.
 - A reasonable question that is not about notes, sources, or weather: answer briefly from knowledge. Do not force a tool.
 
@@ -91,6 +98,23 @@ def build_model():
     return ChatOpenAI(**kwargs)
 
 
+def today_label(now: datetime | None = None) -> str:
+    moment = now or datetime.now(CLOCK_ZONE)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=CLOCK_ZONE)
+    return moment.astimezone(CLOCK_ZONE).strftime("%A, %B %d, %Y")
+
+
+def apply_clock(prompt: str, now: datetime | None = None) -> str:
+    return prompt.replace(CLOCK_TOKEN, today_label(now))
+
+
+@dynamic_prompt
+def stamp_clock(request) -> str:
+    """Fill today's date on every model call."""
+    return apply_clock(request.system_prompt or "")
+
+
 def render_prompt(tools: list, unavailable: list[str], notes_dir: str) -> str:
     if tools:
         catalog = "\n".join(f"- {tool.name}: {tool.description}" for tool in tools)
@@ -114,6 +138,7 @@ async def build_agent() -> ResearchAgent:
         model=build_model(),
         tools=tools,
         system_prompt=render_prompt(tools, unavailable, str(notes)),
+        middleware=[stamp_clock],
         checkpointer=checkpointer,
     )
     return ResearchAgent(
@@ -141,4 +166,26 @@ async def ask(runtime: ResearchAgent, query: str, session_id: str) -> str:
             "I stopped because the tool loop ran too long. "
             "Ask me to continue with one smaller step."
         )
-    return extract_response(result)
+    text = extract_response(result)
+    if text != EMPTY_RESPONSE:
+        return text
+    logger.warning("empty assistant text session=%s; asking for a plain reply", session_id)
+    try:
+        retry = await runtime.agent.ainvoke(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": (
+                            "Reply in plain text to my last question, using only this session. "
+                            "Do not call a tool."
+                        ),
+                    }
+                ]
+            },
+            config,
+        )
+    except GraphRecursionError:
+        return text
+    retried = extract_response(retry)
+    return retried if retried != EMPTY_RESPONSE else text
