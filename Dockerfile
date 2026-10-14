@@ -1,5 +1,5 @@
 # Adapted from Assignment 1 §4.3 — multi-stage python:3.13-slim image with Node
-# so the filesystem and Tavily MCP servers can be launched through npx.
+# so the filesystem, Tavily, and weather MCP servers can be launched through npx.
 # Packages go to /usr/local instead of /root/.local so the non-root user can import them.
 
 FROM python:3.13-slim AS build
@@ -11,7 +11,7 @@ FROM python:3.13-slim
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends nodejs npm ca-certificates \
-    && npm install -g @modelcontextprotocol/server-filesystem tavily-mcp \
+    && npm install -g @modelcontextprotocol/server-filesystem tavily-mcp weather-open-meteo-mcp@0.1.2 \
     && npm cache clean --force \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /install /usr/local

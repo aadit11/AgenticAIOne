@@ -16,5 +16,10 @@
     "transport": "stdio",
     "command": "mcp-server-sqlite",
     "args": ["--db-path", "${SQLITE_PATH}"]
+  },
+  "weather": {
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "weather-open-meteo-mcp@0.1.2"]
   }
 }

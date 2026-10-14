@@ -51,12 +51,11 @@ async def guard_mcp_call(request: object, handler):
 
 async def load_mcp_tools(
     manifest: Path | None = None,
-) -> tuple[list, list[str], list[MultiServerMCPClient]]:
+) -> tuple[list, list[str]]:
     """Run tools/list on each server. One dead server does not drop the others."""
     connections, skipped = load_server_config(manifest)
     tools: list = []
     failures = list(skipped)
-    clients: list[MultiServerMCPClient] = []
 
     for name, connection in connections.items():
         client = MultiServerMCPClient(
@@ -74,10 +73,9 @@ async def load_mcp_tools(
             failures.append(f"{name}: tools/list returned no tools")
             continue
         tools.extend(discovered)
-        clients.append(client)
         logger.info(
             "MCP server %s tools: %s",
             name,
             ", ".join(tool.name for tool in discovered),
         )
-    return tools, failures, clients
+    return tools, failures

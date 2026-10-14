@@ -10,7 +10,7 @@ from config_loader import ensure_storage, load_server_config
 
 class ConfigLoaderTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.root = Path(self.tmp.name)
         self.notes = self.root / "notes"
         self.database = self.root / "data" / "research.db"
@@ -68,6 +68,20 @@ class ConfigLoaderTests(unittest.TestCase):
         self.assertEqual(connections["tavily"]["args"][:4], ["/d", "/s", "/c", "npx"])
         self.assertEqual(connections["tavily"]["env"]["TAVILY_API_KEY"], "tvly-test")
         self.assertIn("PATH", connections["sqlite"]["env"])
+
+    def test_weather_server_needs_no_key(self) -> None:
+        manifest = Path(__file__).resolve().parents[1] / "mcp_config.json"
+        connections, skipped = load_server_config(
+            manifest,
+            environ={"PATH": "/usr/bin", "TAVILY_API_KEY": "tvly-test"},
+            platform="posix",
+            notes=self.notes,
+            database=self.database,
+        )
+        self.assertIn("weather", connections)
+        self.assertEqual(connections["weather"]["command"], "npx")
+        self.assertIn("weather-open-meteo-mcp@0.1.2", connections["weather"]["args"])
+        self.assertFalse(any(item.startswith("weather:") for item in skipped))
 
     def test_schema_is_created(self) -> None:
         previous_notes = os.environ.get("NOTES_DIR")

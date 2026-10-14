@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Adapted from Assignment 1 §4.4 — build the image and deploy it to Cloud Run.
 # Credentials come from the shell environment, never from this file.
+# The weather server is Open-Meteo and has no API key.
 
 set -euo pipefail
 cd "$(dirname "$0")"

@@ -28,17 +28,19 @@ You can do only these things:
    sources(id INTEGER PRIMARY KEY, title TEXT NOT NULL, url TEXT, summary TEXT, topic TEXT, saved_at TEXT)
    sqlite_read_query is SELECT only. Example: SELECT id, title, url, summary, topic, saved_at FROM sources ORDER BY id;
    sqlite_write_query is one INSERT, UPDATE, or DELETE. Example: INSERT INTO sources (title, url, summary, topic) VALUES ('Title', 'https://example.com', 'one sentence', 'topic');
-5. Remember this session. "What did I ask?", "that", and "the last one" refer to earlier turns in this session. No tool.
+5. Look up the current weather with the Open-Meteo weather server. weather_weather-get_hourly is the next 12 hours. weather_weather-get_daily is a longer forecast. location is a city name. units is "metric" or "imperial". days is 1, 5, 10, or 15.
+6. Remember this session. "What did I ask?", "that", and "the last one" refer to earlier turns in this session. No tool.
 
 Choose from the meaning of the request:
 - A definition or explanation, with no request to look it up or save it: answer from knowledge. Do not call a tool.
-- A lookup of current or external information: Tavily only.
+- A lookup of current or external information that is not a weather forecast: Tavily only.
 - Read, list, or edit a note file: filesystem only.
 - "What have I saved?", "list my sources", or "record this source": SQLite only. Never answer a catalog question from memory.
 - Find something and keep it: before the final answer, call Tavily, then write the note, then sqlite_write_query. Do not stop after the search or after the file write.
-- A reasonable question that is not about notes or sources: answer briefly from knowledge. Do not force a tool.
+- A weather, temperature, or forecast question: the weather server only. Do not use Tavily, and do not answer today's weather from memory.
+- A reasonable question that is not about notes, sources, or weather: answer briefly from knowledge. Do not force a tool.
 
-Write like a notebook. Name what you did, in a few sentences: searched, saved a file path, or inserted a catalog row. Do not offer unrelated tasks. If a tool result says the server is down, the tool failed, or the response could not be parsed, say that and do not invent file contents, search hits, or database rows.
+Write like a notebook. Name what you did, in a few sentences: searched, saved a file path, inserted a catalog row, or fetched a forecast. Do not offer unrelated tasks. If a tool result says the server is down, the tool failed, or the response could not be parsed, say that and do not invent file contents, search hits, database rows, or weather numbers.
 
 Discovered tools:
 {tool_catalog}
@@ -54,7 +56,6 @@ class ResearchAgent:
     checkpointer: MemorySaver
     tool_names: list[str] = field(default_factory=list)
     unavailable: list[str] = field(default_factory=list)
-    clients: list = field(default_factory=list)
 
 
 def build_model():
@@ -105,7 +106,7 @@ def render_prompt(tools: list, unavailable: list[str], notes_dir: str) -> str:
 
 async def build_agent() -> ResearchAgent:
     notes, _database = ensure_storage()
-    tools, unavailable, clients = await load_mcp_tools()
+    tools, unavailable = await load_mcp_tools()
     if unavailable:
         logger.warning("MCP servers unavailable: %s", "; ".join(unavailable))
     checkpointer = MemorySaver()
@@ -120,7 +121,6 @@ async def build_agent() -> ResearchAgent:
         checkpointer=checkpointer,
         tool_names=[tool.name for tool in tools],
         unavailable=unavailable,
-        clients=clients,
     )
 
 

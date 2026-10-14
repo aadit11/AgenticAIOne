@@ -18,6 +18,7 @@ How you tested past a single happy-path request. Cover at least:
 
 - a question that should not call a tool
 - a search that should call Tavily
+- a weather question that should call the Open-Meteo server, not Tavily
 - a follow-up in the same `session_id` that should use memory, and a second `session_id` that should not see that history
 - one query that chains two or more tools
 - a missing file or a stopped MCP server, and what the HTTP response was

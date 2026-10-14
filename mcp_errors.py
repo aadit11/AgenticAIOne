@@ -46,8 +46,6 @@ def classify_failure(exc: BaseException) -> str:
         return "execution"
 
     blob = f"{type(exc).__name__} {exc}".lower()
-    if any(marker in blob for marker in ("jsondecode", "validationerror", "malformed")):
-        return "malformed"
     if any(marker in blob for marker in MALFORMED_MARKERS):
         return "malformed"
     if any(marker in blob for marker in TRANSPORT_MARKERS):

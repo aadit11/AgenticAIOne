@@ -93,7 +93,7 @@ def load_server_config(
     """Return stdio connection configs and servers that were skipped on purpose."""
     manifest_path = path or config_path()
     source_env = dict(os.environ if environ is None else environ)
-    current_platform = platform or os.name
+    current_platform = platform or sys.platform
     notes_root = (notes or notes_dir()).resolve()
     database_file = (database or sqlite_path()).resolve()
     variables = {

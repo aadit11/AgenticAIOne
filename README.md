@@ -1,6 +1,6 @@
 # Research Notebook Agent
 
-A research notebook for CSCI 599 Assignment 1. It is not a general chatbot. `POST /chat` does five things: explain a concept from knowledge, search the web, save a markdown note, catalog the source in SQLite, and remember the session.
+A research notebook for CSCI 599 Assignment 1. It is not a general chatbot. `POST /chat` does six things: explain a concept from knowledge, search the web, save a markdown note, catalog the source in SQLite, look up the current weather, and remember the session.
 
 A request to find something and keep it searches, writes the note, and inserts a catalog row before it answers. A definition, or a question about the conversation, uses no tool. The `session_id` keeps that notebook thread while the Cloud Run instance is running.
 
@@ -11,8 +11,9 @@ A request to find something and keep it searches, writes the note, and inserts a
 | filesystem | [`@modelcontextprotocol/server-filesystem`](https://github.com/modelcontextprotocol/servers) | Read and write notes under `notes/` |
 | tavily | [`tavily-mcp`](https://github.com/tavily-ai/tavily-mcp) | Web search for papers, docs, and current facts |
 | sqlite | [`mcp-server-sqlite`](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/sqlite) | Query and update the `sources` table |
+| weather | [`weather-open-meteo-mcp`](https://github.com/adrianR84/Weather-Open-Meteo-MCP) | Current hourly and daily forecasts from Open-Meteo |
 
-Filesystem and Tavily are the two required servers. SQLite is the additional server: notes are the pages a person reads, and the database is the list of sources the agent can filter later. The assignment names `@modelcontextprotocol/server-sqlite` on npm. That package is not published. The official server from the Model Context Protocol project is the Python package `mcp-server-sqlite`, launched as `mcp-server-sqlite --db-path <file>`. This project uses that server.
+Filesystem and Tavily are the two required servers. SQLite is the additional catalog server: notes are the pages a person reads, and the database is the list of sources the agent can filter later. Weather is a second additional server. A forecast is a different `tools/call` from web search, and Open-Meteo does not need an API key. The assignment names `@modelcontextprotocol/server-sqlite` on npm. That package is not published. The official server from the Model Context Protocol project is the Python package `mcp-server-sqlite`, launched as `mcp-server-sqlite --db-path <file>`. This project uses that server.
 
 Discovery and calls go through `langchain-mcp-adapters` (`tools/list` and `tools/call`). Tool results are not hard-coded. If a server is down, a tool returns an error, or a payload cannot be read, the wrapper turns that into a tool message and the HTTP handler still returns JSON.
 
@@ -21,6 +22,7 @@ Discovery and calls go through `langchain-mcp-adapters` (`tools/list` and `tools
 - **LLM.** Default is NVIDIA NIM through `ChatNVIDIA`, model `nvidia/nemotron-3.5-lightning-30b-a3b`. Put the key in `NVIDIA_API_KEY` inside `.env`. The free tier is about 40 requests per minute. OpenAI `gpt-5` is used only when `NVIDIA_API_KEY` is unset and `OPENAI_API_KEY` is set.
 - **Tavily.** The coursework free tier is enough. The Project Plan includes 4,000 credits per month.
 - **Filesystem and SQLite.** No external API cost.
+- **Weather.** Open-Meteo through `weather-open-meteo-mcp@0.1.2`. No API key. The non-commercial forecast API is free.
 - **Cloud Run.** `us-west1`, 512Mi, minimum 0 instances, maximum 1 instance. Scale-to-zero keeps idle cost near zero. Last semester's reference for three Cloud Run projects was under $10 of the $50 education credit.
 
 Ollama is for local experiments only. Do not deploy it. The live service must use OpenAI or NIM.
@@ -39,7 +41,7 @@ deploy.sh          Cloud Run deploy
 
 ## Setup
 
-Python 3.13 matches the container. `mcp-server-sqlite` requires Python 3.10 or newer. Node.js is required for the filesystem and Tavily servers.
+Python 3.13 matches the container. `mcp-server-sqlite` requires Python 3.10 or newer. Node.js 18 or newer is required for the filesystem, Tavily, and weather servers.
 
 ```bash
 python -m venv .venv
@@ -92,6 +94,7 @@ Use the same `session_id` for a follow-up such as "What did I just ask you?". A 
 
 - "What is the Model Context Protocol?" should answer with no tool.
 - "Search for recent writing on tool-using agents." should call Tavily.
+- "What is the weather in Los Angeles today?" should call the weather server, not Tavily.
 - "Save that summary to notes/agents.md", same `session_id`, should write a file.
 - "Record that source in the catalog" should insert a `sources` row.
 - "Search for LangGraph checkpointers, save a note, and record the source" should chain search, then a file write, then a SQL insert.
@@ -110,7 +113,7 @@ docker build -t csci599-a1 .
 docker run --env-file .env -e PORT=8080 -p 8080:8080 csci599-a1
 ```
 
-The image installs Node, the two npm MCP servers, and `mcp-server-sqlite`. The final stage runs as `appuser`.
+The image installs Node, the npm MCP servers (filesystem, Tavily, and weather), and `mcp-server-sqlite`. The final stage runs as `appuser`.
 
 ## Deploy
 
@@ -146,9 +149,11 @@ flowchart LR
   Wrapper -->|tools/list and tools/call| FS[Filesystem MCP server]
   Wrapper -->|tools/list and tools/call| Tav[Tavily MCP server]
   Wrapper -->|tools/list and tools/call| SQL[SQLite MCP server]
+  Wrapper -->|tools/list and tools/call| WX[Weather MCP server]
   FS --> Wrapper
   Tav --> Wrapper
   SQL --> Wrapper
+  WX --> Wrapper
   Graph --> API
   API -->|response| Client
 ```
@@ -163,7 +168,7 @@ flowchart TD
   Choice -->|no| Final[Final response]
   Choice -->|yes| Select[Tool selection]
   Select --> Call[MCP tools/call]
-  Call --> Server[Filesystem, Tavily, or SQLite response]
+  Call --> Server[Filesystem, Tavily, SQLite, or weather response]
   Server --> Synth[LLM synthesis step]
   Synth -->|another tool is needed| Reason
   Synth -->|answer is complete| Final
